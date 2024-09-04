@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>RGB LED Controller</title>
+  <meta name='mobile-web-app-capable' content='yes' />
+  <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      padding: 0;
+      text-align: center;
+      background-color: #f4f4f4;
+    }
+    h1 {
+      color: #333;
+    }
+    #colorPicker {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      margin-bottom: 20px;
+      border: 10px solid #fff;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      animation: rgbBorder 3s infinite alternate-reverse;
+    }
+    button {
+      width: 80%;
+      margin: 10px;
+      padding: 10px;
+      font-size: 18px;
+      border: none;
+      border-radius: 5px;
+      background-color: #007bff;
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    @keyframes rgbBorder {
+       0% { border-color: red; }
+      20% { border-color: orange; }
+      40% { border-color: yellow; }
+      60% { border-color: green; }
+      80% { border-color: cyan; }
+      100% { border-color: blue; }
+    }
+    footer {
+      margin-top: 20px;
+    }
+    footer p {
+      margin: 0;
+    }
+    .social-link {
+      text-decoration: none;
+      color: #007bff;
+      font-weight: bold;
+    }
+    .social-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>RGB LED Controller</h1>
+  <input type='color' id='colorPicker' onchange='selectColor()'><br><br>
+  <button onclick='fade()'>Fade</button><br>
+  <button onclick='flash()'>Flash</button><br>
+  <button onclick='rainbowCycle()'>Rainbow Cycle</button><br>
+  <button onclick='pulse()'>Pulse</button><br>
+  <button onclick='strobe()'>Strobe</button><br>
+  <button onclick='blink()'>Blink</button><br>
+  <footer>
+    <p>Created by <a href="https://www.facebook.com/srij0nbasak" class="social-link" target="_blank">Srijon Basak</a></p>
+  </footer>
+  <script>
+    function selectColor() {
+      var color = document.getElementById('colorPicker').value;
+      var r = parseInt(color.substr(1, 2), 16) * 4;
+      var g = parseInt(color.substr(3, 2), 16) * 4;
+      var b = parseInt(color.substr(5, 2), 16) * 4;
+      var req = new XMLHttpRequest();
+      req.open('POST', '/selectColor?r=' + r + '&g=' + g + '&b=' + b, true);
+      req.send();
+    }
+    function fade() {
+      var req = new XMLHttpRequest();
+      req.open('POST', '/fade', true);
+      req.send();
+    }
+    function flash() {
+      var req = new XMLHttpRequest();
+      req.open('POST', '/flash', true);
+      req.send();
+    }
+    function rainbowCycle() {
+      var req = new XMLHttpRequest();
+      req.open('POST', '/rainbowCycle', true);
+      req.send();
+    }
+    function pulse() {
+      var req = new XMLHttpRequest();
+      req.open('POST', '/pulse', true);
+      req.send();
+    }
+    function strobe() {
+      var req = new XMLHttpRequest();
+      req.open('POST', '/strobe', true);
+      req.send();
+    }
+    function blink() {
+      var req = new XMLHttpRequest();
+      req.open('POST', '/blink', true);
+      req.send();
+    }
+  </script>
+</body>
+</html>
