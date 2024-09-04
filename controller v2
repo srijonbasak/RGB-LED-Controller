@@ -1,0 +1,617 @@
+#include <ESP8266WiFi.h>
+#include <DNSServer.h>
+#include <ESP8266WebServer.h>
+
+const char *ssid = "The IoT Projects";
+const char *password = "";
+const byte DNS_PORT = 53;
+const int redLED = 0;   //D3
+const int greenLED = 4; //D2
+const int blueLED = 5;  //D1
+IPAddress apIP(192, 168, 1, 5);
+DNSServer dnsServer;
+ESP8266WebServer webServer(80);
+
+int colorR = 1023;
+int colorG = 1023;
+int colorB = 1023;
+bool useSelectedColor = true;
+
+enum Mode { SOLID, COLOR_CYCLING, FADING, STROBE, PULSE, BREATHE, FADE_IN_OUT, RANDOM_COLOR, COLOR_CHASE, TWINKLE, STROBE_COLOR_CYCLING, PULSE_FADING, TWINKLE_RANDOM_COLOR };
+Mode currentMode = SOLID;
+
+String webpage = ""
+"<!DOCTYPE html><html><head><title>RGB LED Controller</title><meta name='mobile-web-app-capable' content='yes' />"
+"<meta name='viewport' content='width=device-width, initial-scale=1.0' />"
+"<style>"
+"body { font-family: Arial, sans-serif; margin: 20px; padding: 0; text-align: center; background-color: #f4f4f4; }"
+"h1 { color: #333; }"
+"#colorPicker { "
+"  width: 150px; "
+"  height: 150px; "
+"  border-radius: 50%; "
+"  margin-bottom: 20px; "
+"  border: 10px solid red; "
+"  animation: rgbBorder 2s infinite; "
+"}"
+"button { width: 80%; margin: 10px; padding: 10px; font-size: 18px; border: none; border-radius: 5px; background-color: #007bff; color: #fff; cursor: pointer; transition: background-color 0.3s; }"
+"button:hover { background-color: #0056b3; }"
+"@keyframes rgbBorder {"
+"  0% { border-color: rgb(255, 0, 0); }"
+"  10% { border-color: rgb(255, 127, 0); }"
+"  20% { border-color: rgb(255, 255, 0); }"
+"  30% { border-color: rgb(0, 255, 0); }"
+"  40% { border-color: rgb(0, 255, 255); }"
+"  50% { border-color: rgb(0, 0, 255); }"
+"  60% { border-color: rgb(75, 0, 130); }"
+"  70% { border-color: rgb(153, 50, 204); }"
+"  80% { border-color: rgb(255, 192, 203); }"
+"  90% { border-color: rgb(135, 206, 235); }"
+"  100% { border-color: rgb(255, 255, 255); }"
+"}"
+"footer { margin-top: 20px; }"
+"footer p { margin: 0; }"
+".social-link { text-decoration: none; color: #007bff; font-weight: bold; }"
+".social-link:hover { text-decoration: underline; }"
+"</style></head><body>"
+"<h1>RGB LED Controller</h1>"
+"<input type='color' id='colorPicker' onchange='selectColor()'><br><br>"
+"<button onclick='solidColor()'>Solid Color</button><br>"
+"<button onclick='colorCycling()'>Color Cycling</button><br>"
+"<button onclick='fading()'>Fading</button><br>"
+"<button onclick='strobe()'>Strobe</button><br>"
+"<button onclick='pulse()'>Pulse</button><br>"
+"<button onclick='breathe()'>Breathe</button><br>"
+"<button onclick='fadeInOut()'>Fade In/Out</button><br>"
+"<button onclick='randomColor()'>Random Color</button><br>"
+"<button onclick='colorChase()'>Color Chase</button><br>"
+"<button onclick='twinkle()'>Twinkle</button><br>"
+"<button onclick='strobeColorCycling()'>Strobe with Color Cycling</button><br>"
+"<button onclick='pulseFading()'>Pulse with Fading</button><br>"
+"<button onclick='twinkleRandomColor()'>Twinkle with Random Color</button><br>"
+"<footer>"
+"  <p>Created by <a href='https://www.facebook.com/srij0nbasak' class='social-link' target='_blank'>Srijon Basak</a></p>"
+"</footer>"
+"<script>"
+"function selectColor() {"
+"  var color = document.getElementById('colorPicker').value;"
+"  var r = parseInt(color.substr(1, 2), 16) * 4;"
+"  var g = parseInt(color.substr(3, 2), 16) * 4;"
+"  var b = parseInt(color.substr(5, 2), 16) * 4;"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/selectColor?r=' + r + '&g=' + g + '&b=' + b, true);"
+"  req.send();"
+"}"
+"function solidColor() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/solidColor', true);"
+"  req.send();"
+"}"
+"function colorCycling() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/colorCycling', true);"
+"  req.send();"
+"}"
+"function fading() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/fading', true);"
+"  req.send();"
+"}"
+"function strobe() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/strobe', true);"
+"  req.send();"
+"}"
+"function pulse() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/pulse', true);"
+"  req.send();"
+"}"
+"function breathe() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/breathe', true);"
+"  req.send();"
+"}"
+"function fadeInOut() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/fadeInOut', true);"
+"  req.send();"
+"}"
+"function randomColor() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/randomColor', true);"
+"  req.send();"
+"}"
+"function colorChase() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/colorChase', true);"
+"  req.send();"
+"}"
+"function twinkle() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/twinkle', true);"
+"  req.send();"
+"}"
+"function strobeColorCycling() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/strobeColorCycling', true);"
+"  req.send();"
+"}"
+"function pulseFading() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/pulseFading', true);"
+"  req.send();"
+"}"
+"function twinkleRandomColor() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/twinkleRandomColor', true);"
+"  req.send();"
+"}"
+"</script></html>";
+
+void handleRoot() {
+  webServer.send(200, "text/html", webpage);
+}
+
+void handleSelectColor() {
+  String red = webServer.arg("r");
+  String green = webServer.arg("g");
+  String blue = webServer.arg("b");
+
+  if ((red != "") && (green != "") && (blue != "")) {
+    colorR = red.toInt();
+    colorG = green.toInt();
+    colorB = blue.toInt();
+    setSolidColor();
+    currentMode = SOLID;  // Switch to solid mode
+  }
+
+  Serial.print("Selected Color - Red: ");
+  Serial.println(colorR);
+  Serial.print("Green: ");
+  Serial.println(colorG);
+  Serial.print("Blue: ");
+  Serial.println(colorB);
+  Serial.println();
+}
+
+void handleSolidColor() {
+  currentMode = SOLID;
+}
+
+void handleColorCycling() {
+  currentMode = COLOR_CYCLING;
+}
+
+void handleFading() {
+  currentMode = FADING;
+}
+
+void handleStrobe() {
+  currentMode = STROBE;
+}
+
+void handlePulse() {
+  currentMode = PULSE;
+}
+
+void handleBreathe() {
+  currentMode = BREATHE;
+}
+
+void handleFadeInOut() {
+  currentMode = FADE_IN_OUT;
+}
+
+void handleRandomColor() {
+  currentMode = RANDOM_COLOR;
+}
+
+void handleColorChase() {
+  currentMode = COLOR_CHASE;
+}
+
+void handleTwinkle() {
+  currentMode = TWINKLE;
+}
+
+void handleStrobeColorCycling() {
+  currentMode = STROBE_COLOR_CYCLING;
+}
+
+void handlePulseFading() {
+  currentMode = PULSE_FADING;
+}
+
+void handleTwinkleRandomColor() {
+  currentMode = TWINKLE_RANDOM_COLOR;
+}
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid, password);
+  dnsServer.start(DNS_PORT, "*", apIP);
+  webServer.on("/", handleRoot);
+  webServer.on("/selectColor", handleSelectColor);
+  webServer.on("/solidColor", handleSolidColor);
+  webServer.on("/colorCycling", handleColorCycling);
+  webServer.on("/fading", handleFading);
+  webServer.on("/strobe", handleStrobe);
+  webServer.on("/pulse", handlePulse);
+  webServer.on("/breathe", handleBreathe);
+  webServer.on("/fadeInOut", handleFadeInOut);
+  webServer.on("/randomColor", handleRandomColor);
+  webServer.on("/colorChase", handleColorChase);
+  webServer.on("/twinkle", handleTwinkle);
+  webServer.on("/strobeColorCycling", handleStrobeColorCycling);
+  webServer.on("/pulseFading", handlePulseFading);
+  webServer.on("/twinkleRandomColor", handleTwinkleRandomColor);
+  webServer.begin();
+}
+
+void loop() {
+  dnsServer.processNextRequest();
+  webServer.handleClient();
+
+  switch (currentMode) {
+    case SOLID:
+      setSolidColor();
+      break;
+    case COLOR_CYCLING:
+      colorCycling();
+      break;
+    case FADING:
+      fading();
+      break;
+    case STROBE:
+      strobe();
+      break;
+    case PULSE:
+      pulse();
+      break;
+    case BREATHE:
+      breathe();
+      break;
+    case FADE_IN_OUT:
+      fadeInOut();
+      break;
+    case RANDOM_COLOR:
+      randomColor();
+      break;
+    case COLOR_CHASE:
+      colorChase();
+      break;
+    case TWINKLE:
+      twinkle();
+      break;
+    case STROBE_COLOR_CYCLING:
+      strobeColorCycling();
+      break;
+    case PULSE_FADING:
+      pulseFading();
+      break;
+    case TWINKLE_RANDOM_COLOR:
+      twinkleRandomColor();
+      break;
+  }
+}
+
+void setSolidColor() {
+  analogWrite(redLED, colorR);
+  analogWrite(greenLED, colorG);
+  analogWrite(blueLED, colorB);
+}
+
+void colorCycling() {
+  static unsigned long lastUpdate = 0;
+  static int colorIndex = 0;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastUpdate >= 500) {
+    lastUpdate = currentMillis;
+
+    int colors[][3] = {
+      {255, 0, 0},
+      {255, 127, 0},
+      {255, 255, 0},
+      {0, 255, 0},
+      {0, 255, 255},
+      {0, 0, 255},
+      {75, 0, 130},
+      {153, 50, 204},
+      {255, 192, 203},
+      {135, 206, 235},
+      {255, 255, 255}
+    };
+
+    colorIndex = (colorIndex + 1) % 11;
+    analogWrite(redLED, colors[colorIndex][0]);
+    analogWrite(greenLED, colors[colorIndex][1]);
+    analogWrite(blueLED, colors[colorIndex][2]);
+  }
+}
+
+void fading() {
+  static unsigned long lastUpdate = 0;
+  static float intensity = 0;
+  static bool increasing = true;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastUpdate >= 20) {
+    lastUpdate = currentMillis;
+
+    float fadeSpeed = 0.01;
+    if (increasing) {
+      intensity += fadeSpeed;
+      if (intensity >= 1) {
+        intensity = 1;
+        increasing = false;
+      }
+    } else {
+      intensity -= fadeSpeed;
+      if (intensity <= 0) {
+        intensity = 0;
+        increasing = true;
+      }
+    }
+
+    analogWrite(redLED, colorR * intensity);
+    analogWrite(greenLED, colorG * intensity);
+    analogWrite(blueLED, colorB * intensity);
+  }
+}
+
+void strobe() {
+  static unsigned long lastUpdate = 0;
+  static bool state = false;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastUpdate >= 100) {
+    lastUpdate = currentMillis;
+    state = !state;
+
+    if (state) {
+      analogWrite(redLED, colorR);
+      analogWrite(greenLED, colorG);
+      analogWrite(blueLED, colorB);
+    } else {
+      analogWrite(redLED, 0);
+      analogWrite(greenLED, 0);
+      analogWrite(blueLED, 0);
+    }
+  }
+}
+
+void pulse() {
+  static unsigned long lastUpdate = 0;
+  static float intensity = 0;
+  static bool increasing = true;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastUpdate >= 20) {
+    lastUpdate = currentMillis;
+
+    float pulseSpeed = 0.01;
+    if (increasing) {
+      intensity += pulseSpeed;
+      if (intensity >= 1) {
+        intensity = 1;
+        increasing = false;
+      }
+    } else {
+      intensity -= pulseSpeed;
+      if (intensity <= 0) {
+        intensity = 0;
+        increasing = true;
+      }
+    }
+
+    analogWrite(redLED, colorR * intensity);
+    analogWrite(greenLED, colorG * intensity);
+    analogWrite(blueLED, colorB * intensity);
+  }
+}
+
+void breathe() {
+  static unsigned long lastUpdate = 0;
+  static float intensity = 0;
+  static bool increasing = true;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastUpdate >= 20) {
+    lastUpdate = currentMillis;
+
+    float breatheSpeed = 0.01;
+    if (increasing) {
+      intensity += breatheSpeed;
+      if (intensity >= 1) {
+        intensity = 1;
+        increasing = false;
+      }
+    } else {
+      intensity -= breatheSpeed;
+      if (intensity <= 0) {
+        intensity = 0;
+        increasing = true;
+      }
+    }
+
+    analogWrite(redLED, colorR * intensity);
+    analogWrite(greenLED, colorG * intensity);
+    analogWrite(blueLED, colorB * intensity);
+  }
+}
+
+void fadeInOut() {
+  static unsigned long lastUpdate = 0;
+  static float intensity = 0;
+  static bool increasing = true;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastUpdate >= 20) {
+    lastUpdate = currentMillis;
+
+    float fadeSpeed = 0.01;
+    if (increasing) {
+      intensity += fadeSpeed;
+      if (intensity >= 1) {
+        intensity = 1;
+        increasing = false;
+      }
+    } else {
+      intensity -= fadeSpeed;
+      if (intensity <= 0) {
+        intensity = 0;
+        increasing = true;
+      }
+    }
+
+    analogWrite(redLED, colorR * intensity);
+    analogWrite(greenLED, colorG * intensity);
+    analogWrite(blueLED, colorB * intensity);
+  }
+}
+
+void randomColor() {
+  static unsigned long lastUpdate = 0;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastUpdate >= 1000) {
+    lastUpdate = currentMillis;
+
+    int r = random(0, 256);
+    int g = random(0, 256);
+    int b = random(0, 256);
+
+    analogWrite(redLED, r);
+    analogWrite(greenLED, g);
+    analogWrite(blueLED, b);
+  }
+}
+
+void colorChase() {
+  static unsigned long lastUpdate = 0;
+  static int colorIndex = 0;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastUpdate >= 100) {
+    lastUpdate = currentMillis;
+
+    int colors[][3] = {
+      {255, 0, 0},
+      {255, 127, 0},
+      {255, 255, 0},
+      {0, 255, 0},
+      {0, 255, 255},
+      {0, 0, 255},
+      {75, 0, 130},
+      {153, 50, 204},
+      {255, 192, 203},
+      {135, 206, 235},
+      {255, 255, 255}
+    };
+
+    colorIndex = (colorIndex + 1) % 11;
+
+    for (int i = 0; i < 3; i++) {
+      analogWrite(redLED, (i == 0) ? colors[colorIndex][0] : 0);
+      analogWrite(greenLED, (i == 1) ? colors[colorIndex][1] : 0);
+      analogWrite(blueLED, (i == 2) ? colors[colorIndex][2] : 0);
+      delay(50);
+    }
+  }
+}
+
+void twinkle() {
+  static unsigned long lastUpdate = 0;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastUpdate >= 100) {
+    lastUpdate = currentMillis;
+
+    if (random(0, 10) < 2) {
+      analogWrite(redLED, random(0, 256));
+      analogWrite(greenLED, random(0, 256));
+      analogWrite(blueLED, random(0, 256));
+    } else {
+      analogWrite(redLED, 0);
+      analogWrite(greenLED, 0);
+      analogWrite(blueLED, 0);
+    }
+  }
+}
+
+void strobeColorCycling() {
+  static unsigned long lastUpdate = 0;
+  static bool state = false;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastUpdate >= 100) {
+    lastUpdate = currentMillis;
+    state = !state;
+
+    if (state) {
+      colorCycling();
+    } else {
+      analogWrite(redLED, 0);
+      analogWrite(greenLED, 0);
+      analogWrite(blueLED, 0);
+    }
+  }
+}
+
+void pulseFading() {
+  static unsigned long lastUpdate = 0;
+  static float intensity = 0;
+  static bool increasing = true;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastUpdate >= 20) {
+    lastUpdate = currentMillis;
+
+    float pulseSpeed = 0.01;
+    float fadeSpeed = 0.01;
+
+    if (increasing) {
+      intensity += pulseSpeed;
+      if (intensity >= 1) {
+        intensity = 1;
+        increasing = false;
+      }
+    } else {
+      intensity -= pulseSpeed;
+      if (intensity <= 0) {
+        intensity = 0;
+        increasing = true;
+      }
+    }
+
+    analogWrite(redLED, colorR * intensity);
+    analogWrite(greenLED, colorG * intensity);
+    analogWrite(blueLED, colorB * intensity);
+  }
+}
+
+void twinkleRandomColor() {
+  static unsigned long lastUpdate = 0;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastUpdate >= 100) {
+    lastUpdate = currentMillis;
+
+    if (random(0, 10) < 2) {
+      int r = random(0, 256);
+      int g = random(0, 256);
+      int b = random(0, 256);
+
+      analogWrite(redLED, r);
+      analogWrite(greenLED, g);
+      analogWrite(blueLED, b);
+    } else {
+      analogWrite(redLED, 0);
+      analogWrite(greenLED, 0);
+      analogWrite(blueLED, 0);
+    }
+  }
+}
