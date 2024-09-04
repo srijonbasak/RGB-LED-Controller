@@ -1,0 +1,302 @@
+#include <ESP8266WiFi.h>
+#include <DNSServer.h>
+#include <ESP8266WebServer.h>
+
+const char *ssid = "The IoT Projects";
+const char *password = "";
+const byte DNS_PORT = 53;
+const int redLED = 0;   //D3
+const int greenLED = 4; //D2
+const int blueLED = 5;  //D1
+IPAddress apIP(192, 168, 1, 5);
+DNSServer dnsServer;
+ESP8266WebServer webServer(80);
+
+int colorR = 1023;
+int colorG = 1023;
+int colorB = 1023;
+bool useSelectedColor = true;
+
+enum Mode { SOLID, FADE, FLASH, RAINBOW, PULSE, STROBE, BLINK };
+Mode currentMode = SOLID;
+
+String webpage = ""
+"<!DOCTYPE html><html><head><title>RGB LED Controller</title><meta name='mobile-web-app-capable' content='yes' />"
+"<meta name='viewport' content='width=device-width, initial-scale=1.0' />"
+"<style>"
+"body { font-family: Arial, sans-serif; margin: 20px; padding: 0; text-align: center; background-color: #f4f4f4; }"
+"h1 { color: #333; }"
+"#colorPicker { "
+"  width: 150px; "
+"  height: 150px; "
+"  border-radius: 50%; "
+"  margin-bottom: 20px; "
+"  border: 10px solid red; "
+"  animation: rgbBorder 2s infinite; "
+"}"
+"button { width: 80%; margin: 10px; padding: 10px; font-size: 18px; border: none; border-radius: 5px; background-color: #007bff; color: #fff; cursor: pointer; transition: background-color 0.3s; }"
+"button:hover { background-color: #0056b3; }"
+"@keyframes rgbBorder {"
+"  0% { border-color: red; }"
+"  20% { border-color: orange; }"
+"  40% { border-color: yellow; }"
+"  60% { border-color: green; }"
+"  80% { border-color: cyan; }"
+"  100% { border-color: blue; }"
+"}"
+"footer { margin-top: 20px; }"
+"footer p { margin: 0; }"
+".social-link { text-decoration: none; color: #007bff; font-weight: bold; }"
+".social-link:hover { text-decoration: underline; }"
+"</style></head><body>"
+"<h1>RGB LED Controller</h1>"
+"<input type='color' id='colorPicker' onchange='selectColor()'><br><br>"
+"<button onclick='fade()'>Fade</button><br>"
+"<button onclick='flash()'>Flash</button><br>"
+"<button onclick='rainbowCycle()'>Rainbow Cycle</button><br>"
+"<button onclick='pulse()'>Pulse</button><br>"
+"<button onclick='strobe()'>Strobe</button><br>"
+"<button onclick='blink()'>Blink</button><br>"
+"<footer>"
+"  <p>Created by <a href='https://www.facebook.com/srij0nbasak' class='social-link' target='_blank'>Srijon Basak</a></p>"
+"</footer>"
+"<script>"
+"function selectColor() {"
+"  var color = document.getElementById('colorPicker').value;"
+"  var r = parseInt(color.substr(1, 2), 16) * 4;"
+"  var g = parseInt(color.substr(3, 2), 16) * 4;"
+"  var b = parseInt(color.substr(5, 2), 16) * 4;"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/selectColor?r=' + r + '&g=' + g + '&b=' + b, true);"
+"  req.send();"
+"}"
+"function fade() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/fade', true);"
+"  req.send();"
+"}"
+"function flash() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/flash', true);"
+"  req.send();"
+"}"
+"function rainbowCycle() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/rainbowCycle', true);"
+"  req.send();"
+"}"
+"function pulse() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/pulse', true);"
+"  req.send();"
+"}"
+"function strobe() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/strobe', true);"
+"  req.send();"
+"}"
+"function blink() {"
+"  var req = new XMLHttpRequest();"
+"  req.open('POST', '/blink', true);"
+"  req.send();"
+"}"
+"</script></html>";
+
+void handleRoot() {
+  webServer.send(200, "text/html", webpage);
+}
+
+void handleSelectColor() {
+  String red = webServer.arg("r");
+  String green = webServer.arg("g");
+  String blue = webServer.arg("b");
+
+  if ((red != "") && (green != "") && (blue != "")) {
+    colorR = red.toInt();
+    colorG = green.toInt();
+    colorB = blue.toInt();
+    setSolidColor();
+    currentMode = SOLID;  // Switch to solid mode
+  }
+
+  Serial.print("Selected Color - Red: ");
+  Serial.println(colorR);
+  Serial.print("Green: ");
+  Serial.println(colorG);
+  Serial.print("Blue: ");
+  Serial.println(colorB);
+  Serial.println();
+}
+
+void handleFade() {
+  currentMode = FADE;
+}
+
+void handleFlash() {
+  currentMode = FLASH;
+}
+
+void handleRainbowCycle() {
+  currentMode = RAINBOW;
+}
+
+void handlePulse() {
+  currentMode = PULSE;
+}
+
+void handleStrobe() {
+  currentMode = STROBE;
+}
+
+void handleBlink() {
+  currentMode = BLINK;
+}
+
+void setup() {
+  pinMode(redLED, OUTPUT);
+  pinMode(greenLED, OUTPUT);
+  pinMode(blueLED, OUTPUT);
+
+  analogWrite(redLED, 1023);
+  analogWrite(greenLED, 1023);
+  analogWrite(blueLED, 1023);
+
+  delay(1000);
+  Serial.begin(115200);
+  Serial.println();
+
+  WiFi.mode(WIFI_AP);
+  WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+  WiFi.softAP(ssid);
+
+  dnsServer.start(DNS_PORT, "rgb", apIP);
+
+  webServer.on("/", handleRoot);
+  webServer.on("/selectColor", handleSelectColor);
+  webServer.on("/fade", handleFade);
+  webServer.on("/flash", handleFlash);
+  webServer.on("/rainbowCycle", handleRainbowCycle);
+  webServer.on("/pulse", handlePulse);
+  webServer.on("/strobe", handleStrobe);
+  webServer.on("/blink", handleBlink);
+
+  webServer.begin();
+
+  setSolidColor(); // Start in solid color mode
+}
+
+void loop() {
+  dnsServer.processNextRequest();
+  webServer.handleClient();
+
+  // Continuously run the current mode
+  switch (currentMode) {
+    case SOLID:
+      setSolidColor();
+      break;
+    case FADE:
+      fadeRGB();
+      break;
+    case FLASH:
+      flashRGB();
+      break;
+    case RAINBOW:
+      rainbowCycle(5);
+      break;
+    case PULSE:
+      pulseRGB();
+      break;
+    case STROBE:
+      strobeRGB(50);
+      break;
+    case BLINK:
+      blinkRGB();
+      break;
+  }
+}
+
+void setSolidColor() {
+  analogWrite(redLED, 1023 - colorR);
+  analogWrite(greenLED, 1023 - colorG);
+  analogWrite(blueLED, 1023 - colorB);
+}
+
+void fadeRGB() {
+  for (int i = 0; i < 1024; i++) {
+    setEffectColor(i);
+    delay(2);
+  }
+  for (int i = 1023; i >= 0; i--) {
+    setEffectColor(i);
+    delay(2);
+  }
+}
+
+void flashRGB() {
+  for (int i = 0; i < 3; i++) {
+    setSolidColor();
+    delay(200);
+    analogWrite(redLED, 1023);
+    analogWrite(greenLED, 1023);
+    analogWrite(blueLED, 1023);
+    delay(200);
+  }
+}
+
+void rainbowCycle(int wait) {
+  for (int i = 0; i < 256 * 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      analogWrite((j == 0) ? redLED : (j == 1) ? greenLED : blueLED, 1023 - getRainbowColor((i + j * 85) % 256));
+    }
+    delay(wait);
+  }
+}
+
+int getRainbowColor(int position) {
+  if (position < 85) return position * 3;
+  if (position < 170) return 255 - (position - 85) * 3;
+  return 0;
+}
+
+void pulseRGB() {
+  for (int i = 0; i < 1024; i++) {
+    setEffectColor(1023 - i);
+    delay(2);
+  }
+  for (int i = 1023; i >= 0; i--) {
+    setEffectColor(1023 - i);
+    delay(2);
+  }
+}
+
+void strobeRGB(int delayTime) {
+  for (int i = 0; i < 10; i++) {
+    setSolidColor();
+    delay(delayTime);
+    analogWrite(redLED, 1023);
+    analogWrite(greenLED, 1023);
+    analogWrite(blueLED, 1023);
+    delay(delayTime);
+  }
+}
+
+void blinkRGB() {
+  for (int i = 0; i < 10; i++) {
+    setSolidColor();
+    delay(500);
+    analogWrite(redLED, 1023);
+    analogWrite(greenLED, 1023);
+    analogWrite(blueLED, 1023);
+    delay(500);
+  }
+}
+
+void setEffectColor(int value) {
+  if (useSelectedColor) {
+    analogWrite(redLED, 1023 - ((colorR * value) / 1023));
+    analogWrite(greenLED, 1023 - ((colorG * value) / 1023));
+    analogWrite(blueLED, 1023 - ((colorB * value) / 1023));
+  } else {
+    analogWrite(redLED, 1023 - value);
+  }
+}
